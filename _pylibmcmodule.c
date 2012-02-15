@@ -133,6 +133,7 @@ static int PylibMC_Client_init(PylibMC_Client *self, PyObject *args,
         unsigned char stype;
         char *hostname;
         unsigned short int port;
+        unsigned short int weight;
 
         got_server |= 1;
         port = 0;
@@ -147,12 +148,12 @@ static int PylibMC_Client_init(PylibMC_Client *self, PyObject *args,
             }
 
             rc = memcached_server_push(self->mc, list);
-            free(list);
+            memcached_server_list_free(list);
             if (rc != MEMCACHED_SUCCESS) {
                 PylibMC_ErrFromMemcached(self, "memcached_server_push", rc);
                 goto it_error;
             }
-        } else if (PyArg_ParseTuple(c_srv, "Bs|H", &stype, &hostname, &port)) {
+        } else if (PyArg_ParseTuple(c_srv, "Bs|HH", &stype, &hostname, &port, &weight)) {
             if (set_stype && set_stype != stype) {
                 PyErr_SetString(PyExc_ValueError, "can't mix transport types");
                 goto it_error;
@@ -166,10 +167,10 @@ static int PylibMC_Client_init(PylibMC_Client *self, PyObject *args,
 
             switch (stype) {
                 case PYLIBMC_SERVER_TCP:
-                    rc = memcached_server_add(self->mc, hostname, port);
+                    rc = memcached_server_add_with_weight(self->mc, hostname, port, weight);
                     break;
                 case PYLIBMC_SERVER_UDP:
-                    rc = memcached_server_add_udp(self->mc, hostname, port);
+                    rc = memcached_server_add_udp_with_weight(self->mc, hostname, port, weight);
                     break;
                 case PYLIBMC_SERVER_UNIX:
                     if (port) {
@@ -177,7 +178,7 @@ static int PylibMC_Client_init(PylibMC_Client *self, PyObject *args,
                                 "can't set port on unix sockets");
                         goto it_error;
                     }
-                    rc = memcached_server_add_unix_socket(self->mc, hostname);
+                    rc = memcached_server_add_unix_socket_with_weight(self->mc, hostname, weight);
                     break;
                 default:
                     PyErr_Format(PyExc_ValueError, "bad type: %u", stype);
